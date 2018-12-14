@@ -1,0 +1,18 @@
+{
+    "learning_rate": 1e-2,
+    "batch_size": 128,
+    "num_epochs": 1250,
+    "num_classes": 10,
+    "keep_prob": 0.5,
+
+    "num_channels": 3,
+    "buffer_size": 1000,
+
+    "image_size": 227,
+    "num_labels": 10,
+    "train_size": 50000,
+    "eval_size": 10000,
+
+    "num_parallel_calls": 8,
+    "save_summary_steps": 50
+}
