@@ -82,7 +82,7 @@ class AlexNet(object):
 
     def assign_vals(self, op_name, trainable, weights_dict, session):
         with tf.variable_scope(op_name, reuse=True):
-
+            
             # Assign weights/biases to their corresponding tf variable
             for data in weights_dict[op_name]:
 
@@ -96,6 +96,24 @@ class AlexNet(object):
                     var = tf.get_variable('weights', trainable=trainable)
                     session.run(var.assign(data))
 
+    def get_map(self):
+        weights_dict = np.load(self.WEIGHTS_PATH, encoding='bytes').item()
+        del weights_dict['fc8']
+        wd = {}
+
+        for op_name in weights_dict:
+            if op_name not in self.SKIP_LAYER:
+                for data in weights_dict[op_name]:
+
+                    # Biases
+                    if len(data.shape) == 1:
+                        wd[op_name + '/biases:0'] = data
+
+                    # Weights
+                    else:
+                        wd[op_name + '/weights:0'] = data
+
+        return wd
 
     def load_initial_weights(self, session):
         """Load weights from file into network.
@@ -110,10 +128,10 @@ class AlexNet(object):
 
         # Loop over all layer names stored in the weights dict
         for op_name in weights_dict:
-
+                            
             # Check if layer should be set to trainable
             if op_name not in self.SKIP_LAYER:
-
+                
                 self.assign_vals(op_name, False, weights_dict, session)
 
             elif self.load:
@@ -143,7 +161,7 @@ def conv(x, filter_height, filter_width, num_filters, stride_y, stride_x, name, 
                                                     num_filters])
         biases = tf.get_variable('biases', shape=[num_filters])
         deep_params[name] = [weights, biases]
-
+        
     if groups == 1:
         conv = convolve(x, weights)
 
@@ -172,9 +190,8 @@ def fc(x, num_in, num_out, name, deep_params, relu=True, sigmoid=False):
     with tf.variable_scope(name) as scope:
 
         # Create tf variables for the weights and biases
-        weights = tf.get_variable('weights', shape=[num_in, num_out], initializer=tf.contrib.layers.xavier_initializer(),
-                                  trainable=True)
-        biases = tf.get_variable('biases', [num_out], initializer=tf.contrib.layers.xavier_initializer(), trainable=True)
+        weights = tf.get_variable('weights', shape=[num_in, num_out], initializer=tf.contrib.layers.xavier_initializer())
+        biases = tf.get_variable('biases', [num_out], initializer=tf.contrib.layers.xavier_initializer())
 
         deep_params[name] = [weights, biases]
         # Matrix multiply weights and inputs and add bias

@@ -8,13 +8,21 @@ from model.alexnet import AlexNet
 """
 Configuration Part.
 """
-
+'''
 def init_weights(alexnet_model):
 
     # loading from the .npy file
     def InitFn(scaffold,sess):
         alexnet_model.load_initial_weights(sess)
     return InitFn
+'''
+class RestoreHook(tf.train.SessionRunHook):
+    def __init__(self, init_fn):
+        self.init_fn = init_fn
+
+    def after_create_session(self, session, coord=None):
+        if session.run(tf.train.get_or_create_global_step()) == 0:
+            self.init_fn(session)
 
 def model_fn(features, labels, mode, params):
     """Model function for tf.estimator
@@ -27,7 +35,7 @@ def model_fn(features, labels, mode, params):
         model_spec: tf.estimator.EstimatorSpec object
     """
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-    print(features.shape)
+
     # Unpack images
     images = features
     images = tf.reshape(images, [-1, params.image_size, params.image_size, 3])
@@ -36,12 +44,12 @@ def model_fn(features, labels, mode, params):
     # -----------------------------------------------------------
     # MODEL: define the layers of the model
     train_layers = ['fc8', 'fclat', 'fc7', 'fc6']
-    with tf.variable_scope('model'):
-        # Compute the embeddings with the model
-        if is_training:
-            alexnet_model = AlexNet(images, train_layers, params, 'train')
-        else:
-            alexnet_model = AlexNet(images, train_layers, params, 'validate')
+    #with tf.variable_scope('model'):
+    # Compute the embeddings with the model
+    if is_training:
+        alexnet_model = AlexNet(images, train_layers, params, 'train')
+    else:
+        alexnet_model = AlexNet(images, train_layers, params, 'validate')
 
     # Link variable to model output
     score = alexnet_model.fc8
@@ -53,11 +61,11 @@ def model_fn(features, labels, mode, params):
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
     # Unpack labels
-    labels = tf.cast(labels, tf.int32)
+    #labels = tf.cast(labels, tf.int32)
 
     # List of trainable variables of the layers we want to train
     var_list = [v for v in tf.trainable_variables() if v.name.split('/')[0] in train_layers]
-
+    
     # Op for calculating the loss
     with tf.name_scope("softmax_cross_ent"):
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=score,
@@ -66,7 +74,7 @@ def model_fn(features, labels, mode, params):
     # Train op
     with tf.name_scope("train"):
 
-        gst = tf.train.create_global_step()
+        gst = tf.train.get_or_create_global_step()
 
         # Get gradients of all trainable variables
         optimiser = tf.train.GradientDescentOptimizer(params.learning_rate)
@@ -95,25 +103,25 @@ def model_fn(features, labels, mode, params):
 
     # Add gradients to summary
     for gradient, var in grads_and_vars:
-        tf.summary.histogram(var.name + '/gradient', gradient)
+        tf.summary.histogram(var.name[:-2] + '/gradient', gradient)
 
     # Add the variables we train to the summary
     for var in var_list:
-        tf.summary.histogram(var.name, var)
+        tf.summary.histogram(var.name[:-2], var)
 
     # Add the loss to summary
     tf.summary.scalar('softmax_cross_entropy', loss)
 
     # Evaluation op: Accuracy of the model
     with tf.name_scope("accuracy"):
-        prediction = tf.equal(tf.argmax(score, 1), tf.argmax(labels, 1))
-        accuracy = tf.reduce_mean(tf.cast(prediction, tf.float32))
+        predictions = tf.equal(tf.argmax(score, 1), tf.argmax(labels, 1))
+        accuracy = tf.reduce_mean(tf.cast(predictions, tf.float32))
 
     # Add the accuracy to the summary
     tf.summary.scalar('accuracy', accuracy)
 
     eval_metric_ops = {
-      "rmse": tf.metrics.root_mean_squared_error(labels, predictions)
+      "rmse": tf.metrics.root_mean_squared_error(tf.argmax(score, 1), tf.argmax(labels, 1))
     }
 
     predictions_dict = {
@@ -126,9 +134,11 @@ def model_fn(features, labels, mode, params):
         "emb_lab": tf.estimator.export.PredictOutput(labels)
     }
 
-    scaffold = tf.train.Scaffold(init_op=None,
-                                    init_fn=init_weights(alexnet_model))
+    #scaffold = tf.train.Scaffold(init_op=None,
+    #                                init_fn=init_weights(alexnet_model))
+
+    init_fn = tf.contrib.framework.assign_from_values_fn(alexnet_model.get_map())
 
     return tf.estimator.EstimatorSpec(mode = mode, predictions = predictions_dict,
                                         loss = loss, train_op = train_op,
-                                        eval_metric_ops = eval_metric_ops, export_outputs = export_outputs, scaffold = scaffold)
+                                        eval_metric_ops = eval_metric_ops, export_outputs = export_outputs, training_hooks = [RestoreHook(init_fn)])

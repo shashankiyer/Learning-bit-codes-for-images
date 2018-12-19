@@ -9,7 +9,7 @@ from tensorflow.python.framework.ops import convert_to_tensor
 
 import re, os
 
-IMAGENET_MEAN = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32)
+#IMAGENET_MEAN = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32)
 
 
 class ImageDataParser(object):
@@ -37,6 +37,8 @@ class ImageDataParser(object):
             ValueError: If an invalid mode is passed.
 
         """
+        self.IMAGENET_MEAN = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32)
+
         self.txt_file = txt_file
         self.num_classes = params.num_classes
         self.image_size = params.image_size
@@ -63,12 +65,20 @@ class ImageDataParser(object):
         # distinguish between train/infer. when calling the parsing functions
         if mode == 'training':
             data = data.map(self._parse_function_train, num_parallel_calls = params.num_parallel_calls)
+            
+            data = data.shuffle(buffer_size=params.buffer_size)
+            # repeat elements as many times as epochs
+            data = data.repeat(params.num_epochs)
 
         elif mode == 'inference':
             data = data.map(self._parse_function_inference, num_parallel_calls = params.num_parallel_calls)
 
         else:
             raise ValueError("Invalid mode '%s'." % (mode))
+
+        # create a new dataset with batches of images
+        data = data.batch(params.batch_size)
+        data = data.prefetch(1)
 
         self.data = data
 
@@ -114,7 +124,7 @@ class ImageDataParser(object):
         """
         Dataaugmentation comes here.
         """
-        img_centered = tf.subtract(img_resized, IMAGENET_MEAN)
+        img_centered = tf.subtract(img_resized, self.IMAGENET_MEAN)
 
         # swap(2,1,0), bgr -> rgb
         im_rgb = tf.cast(img_centered, tf.float32)[:, :, ::-1]
@@ -130,9 +140,9 @@ class ImageDataParser(object):
         img_string = tf.read_file(filename)
         img_decoded = tf.image.decode_png(img_string, channels=self.num_channels)
         img_resized = tf.image.resize_images(img_decoded, [self.image_size, self.image_size])
-        img_centered = tf.subtract(img_resized, IMAGENET_MEAN)
+        img_centered = tf.subtract(img_resized, self.IMAGENET_MEAN)
 
         # swap(2,1,0), bgr -> rgb
-        im_rgb = tf.cast(img_centered, tf.float32)[:, :, :, ::-1]
+        im_rgb = tf.cast(img_centered, tf.float32)[:, :, ::-1]
 
         return im_rgb, one_hot
