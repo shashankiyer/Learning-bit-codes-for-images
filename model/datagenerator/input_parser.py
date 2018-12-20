@@ -9,16 +9,12 @@ from tensorflow.python.framework.ops import convert_to_tensor
 
 import re, os
 
-#IMAGENET_MEAN = tf.constant([123.68, 116.779, 103.939], dtype=tf.float32)
-
-
 class ImageDataParser(object):
     """Wrapper class around the new Tensorflows dataset pipeline.
-
     """
 
     def __init__(self, txt_file, data_dir, mode, params):
-        """Create a new ImageDataGenerator.
+        """Create a new ImageDataParser.
 
         Recieves a path string to a text file, which consists of many lines,
         where each line has first a path string to an image and seperated by
@@ -62,7 +58,7 @@ class ImageDataParser(object):
         # create dataset
         data = Dataset.from_tensor_slices((self.img_paths, self.labels))
 
-        # distinguish between train/infer. when calling the parsing functions
+        # distinguish between train/eval. when calling the parsing functions
         if mode == 'training':
             data = data.map(self._parse_function_train, num_parallel_calls = params.num_parallel_calls)
             
@@ -70,7 +66,7 @@ class ImageDataParser(object):
             # repeat elements as many times as epochs
             data = data.repeat(params.num_epochs)
 
-        elif mode == 'inference':
+        elif mode == 'evaluate':
             data = data.map(self._parse_function_inference, num_parallel_calls = params.num_parallel_calls)
 
         else:

@@ -54,10 +54,12 @@ def model_fn(features, labels, mode, params):
     # Link variable to model output
     score = alexnet_model.fc8
     embeddings_bin = tf.round(alexnet_model.fclat)
-    embeddings_floats = alexnet_model.fc7
+    #embeddings_floats = alexnet_model.fc7
 
+    # Creating a prediction dictionary
+    predictions = {'Bit_codes': embeddings_bin}
+    
     if mode == tf.estimator.ModeKeys.PREDICT:
-        predictions = {'Bit_codes': embeddings_bin}
         return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
     # Unpack labels
@@ -109,36 +111,35 @@ def model_fn(features, labels, mode, params):
     for var in var_list:
         tf.summary.histogram(var.name[:-2], var)
 
-    # Add the loss to summary
-    tf.summary.scalar('softmax_cross_entropy', loss)
+    # Model's predictions
+    pred = tf.nn.softmax(score)
 
     # Evaluation op: Accuracy of the model
     with tf.name_scope("accuracy"):
-        predictions = tf.equal(tf.argmax(score, 1), tf.argmax(labels, 1))
-        accuracy = tf.reduce_mean(tf.cast(predictions, tf.float32))
+        correctness = tf.equal(tf.argmax(pred, 1), tf.argmax(labels, 1))
+        accuracy = tf.reduce_mean(tf.cast(correctness, tf.float32))
 
     # Add the accuracy to the summary
-    tf.summary.scalar('accuracy', accuracy)
+    tf.summary.scalar('Training_Accuracy', accuracy)
 
     eval_metric_ops = {
-      "rmse": tf.metrics.root_mean_squared_error(tf.argmax(score, 1), tf.argmax(labels, 1))
+      "rmse": tf.metrics.root_mean_squared_error(tf.argmax(score, 1), tf.argmax(labels, 1)),
+      "Eval_Accuracy": tf.metrics.accuracy(labels = tf.argmax(labels,1), predictions = tf.argmax(pred, 1))
     }
 
-    predictions_dict = {
-        "predictions": predictions
-    }
+    predictions['classification'] = pred
 
+    '''
     export_outputs = {
         "emb_bin": tf.estimator.export.PredictOutput(predictions),
         "emb_float": tf.estimator.export.PredictOutput(embeddings_floats),
         "emb_lab": tf.estimator.export.PredictOutput(labels)
     }
-
-    #scaffold = tf.train.Scaffold(init_op=None,
-    #                                init_fn=init_weights(alexnet_model))
+    '''
 
     init_fn = tf.contrib.framework.assign_from_values_fn(alexnet_model.get_map())
 
-    return tf.estimator.EstimatorSpec(mode = mode, predictions = predictions_dict,
+    return tf.estimator.EstimatorSpec(mode = mode, predictions = predictions,
                                         loss = loss, train_op = train_op,
-                                        eval_metric_ops = eval_metric_ops, export_outputs = export_outputs, training_hooks = [RestoreHook(init_fn)])
+                                        #eval_metric_ops = eval_metric_ops, export_outputs = export_outputs, training_hooks = [RestoreHook(init_fn)])
+                                        eval_metric_ops = eval_metric_ops, training_hooks = [RestoreHook(init_fn)])

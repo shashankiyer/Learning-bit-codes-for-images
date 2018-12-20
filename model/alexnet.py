@@ -24,15 +24,10 @@ class AlexNet(object):
         if mode == 'validate':
             self.KEEP_PROB = 1
 
-        if os.path.exists('model/trained_weights/weights_biases.npy'):
-            self.WEIGHTS_PATH = 'model/trained_weights/weights_biases.npy'
-            self.load = True
-        elif os.path.exists('../finetune_alexnet_with_tensorflow/model/pretrained_alexnet/bvlc_alexnet.npy'):
-            self.WEIGHTS_PATH = '../finetune_alexnet_with_tensorflow/model/pretrained_alexnet/bvlc_alexnet.npy'
-            self.load = False
+        if os.path.exists('data/pretrained_alexnet/bvlc_alexnet.npy'):
+            self.WEIGHTS_PATH = 'data/pretrained_alexnet/bvlc_alexnet.npy'
         else:
-            print("Couldn't locate model weights")
-            exit(1)
+            raise ValueError("Couldn't locate model weights in data/pretrained_weights")
 
         # Dict that contains all the params of the DNN
         self.deep_params = {}
@@ -80,31 +75,13 @@ class AlexNet(object):
         self.fc8 = fc(self.fclat, 48, self.num_classes, deep_params=self.deep_params, relu=False, name='fc8')
 
 
-    def assign_vals(self, op_name, trainable, weights_dict, session):
-        with tf.variable_scope(op_name, reuse=True):
-            
-            # Assign weights/biases to their corresponding tf variable
-            for data in weights_dict[op_name]:
-
-                # Biases
-                if len(data.shape) == 1:
-                    var = tf.get_variable('biases', trainable=trainable)
-                    session.run(var.assign(data))
-
-                # Weights
-                else:
-                    var = tf.get_variable('weights', trainable=trainable)
-                    session.run(var.assign(data))
-
     def get_map(self):
         weights_dict = np.load(self.WEIGHTS_PATH, encoding='bytes').item()
-        del weights_dict['fc8']
         wd = {}
-
         for op_name in weights_dict:
             if op_name not in self.SKIP_LAYER:
                 for data in weights_dict[op_name]:
-
+                    
                     # Biases
                     if len(data.shape) == 1:
                         wd[op_name + '/biases:0'] = data
@@ -114,30 +91,6 @@ class AlexNet(object):
                         wd[op_name + '/weights:0'] = data
 
         return wd
-
-    def load_initial_weights(self, session):
-        """Load weights from file into network.
-
-        As the weights from http://www.cs.toronto.edu/~guerzhoy/tf_alexnet/
-        come as a dict of lists (e.g. weights['conv1'] is a list) and not as
-        dict of dicts (e.g. weights['conv1'] is a dict with keys 'weights' &
-        'biases') we need a special load function
-        """
-        # Load the weights into memory
-        weights_dict = np.load(self.WEIGHTS_PATH, encoding='bytes').item()
-
-        # Loop over all layer names stored in the weights dict
-        for op_name in weights_dict:
-                            
-            # Check if layer should be set to trainable
-            if op_name not in self.SKIP_LAYER:
-                
-                self.assign_vals(op_name, False, weights_dict, session)
-
-            elif self.load:
-
-                self.assign_vals(op_name, True, weights_dict, session)
-
 
 def conv(x, filter_height, filter_width, num_filters, stride_y, stride_x, name, deep_params,
          padding='SAME', groups=1):
