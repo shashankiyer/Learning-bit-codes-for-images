@@ -53,7 +53,7 @@ def model_fn(features, labels, mode, params):
 
     # Link variable to model output
     score = alexnet_model.fc8
-    embeddings_bin = tf.round(alexnet_model.fclat)
+    embeddings_bin = tf.cast(tf.round(alexnet_model.fclat), tf.bool)
     #embeddings_floats = alexnet_model.fc7
 
     # Creating a prediction dictionary

@@ -27,18 +27,18 @@ def euclidean_dist(query, database):
 
 def reli_image_wise(k, each_query, list_indices, database_emb_float, each_query_lab, database_lab):
 
-    #db_take = np.take(database_emb_float , list_indices , axis=0)
+    db_take = np.take(database_emb_float , list_indices , axis=0)
 
     if len(list_indices) == 0:
         return 0
-    #euc = euclidean_dist( each_query , db_take)
-    #if len(euc) == 0:
-        #return 0
-    db_lab_take = np.take(database_lab, list_indices, axis = 0)
-    db_lab_take = db_lab_take[:k:1]
-    #db_lab_k = top_k(k, euc, db_lab_take)
     
-    res = np.equal(np.expand_dims(each_query_lab,0), db_lab_take)
+    euc = euclidean_dist( each_query , db_take)
+    
+    db_lab_take = np.take(database_lab, list_indices, axis = 0)
+    #db_lab_take = db_lab_take[:k:1]
+    db_lab_k = top_k(k, euc, db_lab_take)
+    
+    res = np.equal(np.expand_dims(each_query_lab,0), db_lab_k)
     
     res = np.mean(res)
 
@@ -48,7 +48,6 @@ def reli_image_wise(k, each_query, list_indices, database_emb_float, each_query_
 def reli(threshold, k, query_emb_bin, query_emb_float, query_lab, database_emb_bin, database_emb_float, database_lab):
     
     hamming = compute_hamming_dist(query_emb_bin, database_emb_bin)
-    
     ind = np.array([np.where( i <= threshold) for i in hamming])
     
     database_lab = np.argmax(database_lab,1)
@@ -60,7 +59,7 @@ def reli(threshold, k, query_emb_bin, query_emb_float, query_lab, database_emb_b
         it[0] = reli_image_wise(k , query_emb_float[it.index], ind[it.index][0], database_emb_float, query_lab[it.index], database_lab)
         it.iternext()
     
-    return np.mean(res) #, np.median(res),np.std(res), count
+    return np.mean(res) , np.median(res),np.std(res)
 
 if __name__ == "__main__":
     weights_dict = np.load('model_data/trained_weights/data.npy', encoding='bytes').item()

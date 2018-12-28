@@ -1,5 +1,5 @@
 import argparse
-import os, shutil
+import os
 
 import tensorflow as tf
 

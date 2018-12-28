@@ -59,18 +59,18 @@ class ImageDataParser(object):
         data = Dataset.from_tensor_slices((self.img_paths, self.labels))
 
         # distinguish between train/eval. when calling the parsing functions
-        if mode == 'training':
-            data = data.map(self._parse_function_train, num_parallel_calls = params.num_parallel_calls)
+        if mode != 'training' and mode != 'evaluate':
+            raise ValueError("Invalid mode '%s'." % (mode))
+
+        data = data.map(self._parse_function, num_parallel_calls = params.num_parallel_calls)
             
+        if mode == 'evaluate':
+
+            # shuffle elements
             data = data.shuffle(buffer_size=params.buffer_size)
             # repeat elements as many times as epochs
             data = data.repeat(params.num_epochs)
-
-        elif mode == 'evaluate':
-            data = data.map(self._parse_function_inference, num_parallel_calls = params.num_parallel_calls)
-
-        else:
-            raise ValueError("Invalid mode '%s'." % (mode))
+            
 
         # create a new dataset with batches of images
         data = data.batch(params.batch_size)
@@ -115,7 +115,7 @@ class ImageDataParser(object):
         # load and preprocess the image
         img_string = tf.read_file(filename)
         img_decoded = tf.image.decode_png(img_string, channels = self.num_channels)
-        img_resized = tf.image.resize_images(img_decoded, [227, 227])
+        img_resized = tf.image.resize_images(img_decoded, [self.image_size, self.image_size])
         
         """
         Dataaugmentation comes here.
@@ -136,9 +136,8 @@ class ImageDataParser(object):
         img_string = tf.read_file(filename)
         img_decoded = tf.image.decode_png(img_string, channels=self.num_channels)
         img_resized = tf.image.resize_images(img_decoded, [self.image_size, self.image_size])
-        img_centered = tf.subtract(img_resized, self.IMAGENET_MEAN)
 
         # swap(2,1,0), bgr -> rgb
-        im_rgb = tf.cast(img_centered, tf.float32)[:, :, ::-1]
+        im_rgb = tf.cast(img_resized, tf.float32)[:, :, ::-1]
 
         return im_rgb, one_hot

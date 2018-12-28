@@ -24,8 +24,8 @@ class AlexNet(object):
         if mode == 'validate':
             self.KEEP_PROB = 1
 
-        if os.path.exists('data/pretrained_alexnet/bvlc_alexnet.npy'):
-            self.WEIGHTS_PATH = 'data/pretrained_alexnet/bvlc_alexnet.npy'
+        if os.path.exists('../finetune_alexnet_with_tensorflow/model/pretrained_alexnet/bvlc_alexnet.npy'):
+            self.WEIGHTS_PATH = '../finetune_alexnet_with_tensorflow/model/pretrained_alexnet/bvlc_alexnet.npy'
         else:
             raise ValueError("Couldn't locate model weights in data/pretrained_weights")
 
