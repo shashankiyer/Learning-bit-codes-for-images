@@ -6,18 +6,18 @@ import numpy as np
 from model.utils import Params
 from model.alexnet import AlexNet
 from PIL import Image
-from validation_function2 import reli
+from validation_function import reli
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/checkpoint_data/',
                     help="Experiment directory to retrieve model checkpoints")
 parser.add_argument('--model_config', default='experiments',
                     help="Experiment directory containing params.json")
-parser.add_argument('--db_file', default='../../DeepHash/DeepHash/data/cifar10/fulltrain.txt',
+parser.add_argument('--db_file', default='data/cifar10/fulltrain.txt',
                     help="Path to the file containing database data")
-parser.add_argument('--query_file', default='../../DeepHash/DeepHash/data/cifar10/fulltest.txt',
+parser.add_argument('--query_file', default='data/cifar10/fulltest.txt',
                     help="Path to the file containing query data")
-parser.add_argument('--data_dir', default='../../DeepHash/DeepHash/data/cifar10/',
+parser.add_argument('--data_dir', default='data/cifar10/',
                     help="Path to the folder containing data")
 
 
@@ -50,12 +50,6 @@ if __name__ == '__main__':
     emb_bin = tf.cast(tf.round(alexnet_model.fclat), tf.bool)
     emb_flt = alexnet_model.fc7
 
-    database_embed_bin = []
-    database_embed_float = []
-
-    query_embed_bin = []
-    query_embed_float = []
-
     with tf.Session() as sess:
 
         # Regex for parsing every line
@@ -63,58 +57,62 @@ if __name__ == '__main__':
 
         # Restore saved model
         tf.train.Saver().restore(sess, tf.train.latest_checkpoint(args.model_dir))
-        tf.logging.info("Forward propagating images through the DNN")
-        
+
         with open(args.db_file, 'r') as db:
-            # Array of db labels
-            database_lab = []
+            # Array to store images
             ims = []
-            las = []
-            ctr = 1
+
+            # Arrays to store db variables
+            database_lab = []
+            database_embed_float = []
+            database_embed_bin = []
+            
             for line in db:
 
                 with Image.open(os.path.join(args.data_dir, line.split(' ')[0]), 'r') as im:
-                    ima = np.resize(np.array(im), (params.image_size, params.image_size, params.num_channels))
-                la = __str_to_int(re.search(regex, line)[0].split(" "), params.num_classes)
-                
-                ims.append(ima)
-                las.append(la)
+                    ims.append(np.resize(np.array(im), (params.image_size, params.image_size, params.num_channels)))
+                database_lab.append(__str_to_int(re.search(regex, line)[0].split(" "), params.num_classes))
+            
+            tf.logging.info("Forward propagating database images through the DNN")
 
-                if ctr%2 == 0:
-                    flt, binn = sess.run([emb_flt, emb_bin], feed_dict = {images : ims, labels : las})
+            for k in range(0, len(ims), params.batch_size):
+                current_batch_ims = ims[k: k + params.batch_size]
+                current_batch_labels = database_lab[k: k + params.batch_size]
 
-                    database_lab.extend(las)
-                    database_embed_float.extend(flt.tolist())
-                    database_embed_bin.extend(binn.tolist())
+                flt, binn = sess.run([emb_flt, emb_bin], feed_dict = {images : current_batch_ims, labels : current_batch_labels})
 
-                    ims = []
-                    las = []
+                database_embed_float.extend(flt)
+                database_embed_bin.extend(binn)
 
+            # Clearing database images
+            ims.clear()
 
         with open(args.query_file, 'r') as qu:
-            # Array of query labels
-            ims = []
-            las = []
-            ctr = 1
+            
+            # Arrays to store query variables
             query_lab = []
+            query_embed_bin = []
+            query_embed_float = []
+
             for line in qu:
 
                 with Image.open(os.path.join(args.data_dir, line.split(' ')[0]), 'r') as im:
-                    ima = np.resize(np.array(im), (params.image_size, params.image_size, params.num_channels))
-                la = __str_to_int(re.search(regex, line)[0].split(" "), params.num_classes)
-
-                ims.append(ima)
-                las.append(la)
-
-                if ctr%2 == 0:
-                    flt, binn = sess.run([emb_flt, emb_bin], feed_dict = {images : ims, labels : las})
-
-                    query_lab.extend(las)
-                    query_embed_float.extend(flt.tolist())
-                    query_embed_bin.extend(binn.tolist())
+                    ims.append(np.resize(np.array(im), (params.image_size, params.image_size, params.num_channels)))
+                query_lab.append(__str_to_int(re.search(regex, line)[0].split(" "), params.num_classes))
+            
+            tf.logging.info("Forward propagating query images through the DNN")
+            
+            for k in range(0, len(ims), params.batch_size):
+                current_batch_ims = ims[k: k + params.batch_size]
+                current_batch_labels = query_lab[k: k + params.batch_size]
                 
-                    ims = []
-                    las = []
+                flt, binn = sess.run([emb_flt, emb_bin], feed_dict = {images : current_batch_ims, labels : current_batch_labels})
+
+                query_embed_float.extend(flt)
+                query_embed_bin.extend(binn)
+        
+            # Clearing query images
+            ims.clear()
 
         database_embed_bin = np.array(database_embed_bin)
         database_embed_float = np.array(database_embed_float)
@@ -125,4 +123,4 @@ if __name__ == '__main__':
         query_lab = np.array(query_lab)
         
         print("Begining similarity search for", query_embed_bin.shape[0], "query images on" , database_embed_bin.shape[0], "database images")
-        print("Similarity Search accuracy = ", reli(1, 50, query_embed_bin, query_embed_float, query_lab, database_embed_bin, database_embed_float, database_lab))
+        print("Similarity Search accuracy = ", reli(12, 120, query_embed_bin, query_embed_float, query_lab, database_embed_bin, database_embed_float, database_lab))

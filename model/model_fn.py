@@ -5,18 +5,10 @@ import tensorflow as tf
 
 from model.alexnet import AlexNet
 
-"""
-Configuration Part.
-"""
-'''
-def init_weights(alexnet_model):
 
-    # loading from the .npy file
-    def InitFn(scaffold,sess):
-        alexnet_model.load_initial_weights(sess)
-    return InitFn
-'''
 class RestoreHook(tf.train.SessionRunHook):
+    """A TF hook to load initial weights from bvlc.npy
+    """
     def __init__(self, init_fn):
         self.init_fn = init_fn
 
@@ -30,7 +22,7 @@ def model_fn(features, labels, mode, params):
         features: input batch of images
         labels: labels of the images
         mode: can be one of tf.estimator.ModeKeys.{TRAIN, EVAL, PREDICT}
-        params: contains hyperparameters of the model (ex: `params.learning_rate`)
+        params: dictionary of hyperparameters of the model (ex: `params.learning_rate`)
     Returns:
         model_spec: tf.estimator.EstimatorSpec object
     """
@@ -44,8 +36,6 @@ def model_fn(features, labels, mode, params):
     # -----------------------------------------------------------
     # MODEL: define the layers of the model
     train_layers = ['fc8', 'fclat', 'fc7', 'fc6']
-    #with tf.variable_scope('model'):
-    # Compute the embeddings with the model
     if is_training:
         alexnet_model = AlexNet(images, train_layers, params, 'train')
     else:
@@ -54,16 +44,12 @@ def model_fn(features, labels, mode, params):
     # Link variable to model output
     score = alexnet_model.fc8
     embeddings_bin = tf.cast(tf.round(alexnet_model.fclat), tf.bool)
-    #embeddings_floats = alexnet_model.fc7
 
     # Creating a prediction dictionary
     predictions = {'Bit_codes': embeddings_bin}
-    
-    if mode == tf.estimator.ModeKeys.PREDICT:
-        return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
     # Unpack labels
-    #labels = tf.cast(labels, tf.int32)
+    labels = tf.cast(labels, tf.int32)
 
     # List of trainable variables of the layers we want to train
     var_list = [v for v in tf.trainable_variables() if v.name.split('/')[0] in train_layers]
@@ -78,9 +64,9 @@ def model_fn(features, labels, mode, params):
 
         gst = tf.train.get_or_create_global_step()
 
-        # Get gradients of all trainable variables
         optimiser = tf.train.GradientDescentOptimizer(params.learning_rate)
 
+        # Get gradients of all trainable variables
         grads_and_vars = optimiser.compute_gradients(loss, var_list)
 
         fc6w_grad, _ = grads_and_vars[-8]
@@ -92,8 +78,7 @@ def model_fn(features, labels, mode, params):
         fc8w_grad, _ = grads_and_vars[-2]
         fc8b_grad, _ = grads_and_vars[-1]
 
-        # Create optimizer and apply gradient descent to the trainable variables
-        #optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+        # Apply gradient descent to the trainable variables
         train_op = optimiser.apply_gradients([(fc6w_grad, var_list[0]),
                                             (fc6b_grad, var_list[1]),
                                             (fc7w_grad, var_list[2]),
@@ -123,23 +108,14 @@ def model_fn(features, labels, mode, params):
     tf.summary.scalar('Training_Accuracy', accuracy)
 
     eval_metric_ops = {
-      "rmse": tf.metrics.root_mean_squared_error(tf.argmax(score, 1), tf.argmax(labels, 1)),
-      "Eval_Accuracy": tf.metrics.accuracy(labels = tf.argmax(labels,1), predictions = tf.argmax(pred, 1))
+      "Evaluation_Accuracy": tf.metrics.accuracy(labels = tf.argmax(labels,1), predictions = tf.argmax(pred, 1))
     }
 
     predictions['classification'] = pred
 
-    '''
-    export_outputs = {
-        "emb_bin": tf.estimator.export.PredictOutput(predictions),
-        "emb_float": tf.estimator.export.PredictOutput(embeddings_floats),
-        "emb_lab": tf.estimator.export.PredictOutput(labels)
-    }
-    '''
-
+    # Assign pretrained weights to the AlexNet model
     init_fn = tf.contrib.framework.assign_from_values_fn(alexnet_model.get_map())
 
     return tf.estimator.EstimatorSpec(mode = mode, predictions = predictions,
                                         loss = loss, train_op = train_op,
-                                        #eval_metric_ops = eval_metric_ops, export_outputs = export_outputs, training_hooks = [RestoreHook(init_fn)])
                                         eval_metric_ops = eval_metric_ops, training_hooks = [RestoreHook(init_fn)])

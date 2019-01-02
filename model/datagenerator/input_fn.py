@@ -3,9 +3,9 @@ import tensorflow as tf
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--train_file', default='data/cifar10/train.txt',
+parser.add_argument('--train_file', default='data/cifar10/fulltrain.txt',
                     help="Path to the file containing training data")
-parser.add_argument('--val_file', default='data/cifar10/test.txt',
+parser.add_argument('--val_file', default='data/cifar10/fulltest1000.txt',
                     help="Path to the file containing validation data")
 parser.add_argument('--data_dir', default='data/cifar10/',
                     help="Path to the folder containing data")
@@ -13,6 +13,10 @@ parser.add_argument('--data_dir', default='data/cifar10/',
 args = parser.parse_args()              
 
 def read_dataset(params, mode=tf.contrib.learn.ModeKeys.TRAIN):
+  """ Input function that supplies data to the TF estimator
+    Args:
+      params: dictionary of hyperparameters of the model (ex: `params.learning_rate`)
+  """
   def _input_fn():
   
     if mode == tf.contrib.learn.ModeKeys.TRAIN:

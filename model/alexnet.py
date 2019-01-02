@@ -24,8 +24,8 @@ class AlexNet(object):
         if mode == 'validate':
             self.KEEP_PROB = 1
 
-        if os.path.exists('../finetune_alexnet_with_tensorflow/model/pretrained_alexnet/bvlc_alexnet.npy'):
-            self.WEIGHTS_PATH = '../finetune_alexnet_with_tensorflow/model/pretrained_alexnet/bvlc_alexnet.npy'
+        if os.path.exists('data/pretrained_alexnet/bvlc_alexnet.npy'):
+            self.WEIGHTS_PATH = 'data/pretrained_alexnet/bvlc_alexnet.npy'
         else:
             raise ValueError("Couldn't locate model weights in data/pretrained_weights")
 
@@ -58,10 +58,8 @@ class AlexNet(object):
         pool5 = max_pool(conv5, 3, 3, 2, 2, padding='VALID', name='pool5')
 
         # 6th Layer: Flatten -> FC (w ReLu) -> Dropout
-        # Store these values to feedvalues.npy
         self.flattened = tf.reshape(pool5, [-1, 6*6*256])
         #Placeholder to feed the FC layers
-        #self.flattened_placeholder = tf.placeholder(shape = tf.shape(self.flattened))
         fc6 = fc(self.flattened, 6*6*256, 4096, deep_params=self.deep_params, name='fc6')
         dropout6 = dropout(fc6, self.KEEP_PROB)
 
@@ -69,13 +67,15 @@ class AlexNet(object):
         self.fc7 = fc(dropout6, 4096, 4096, deep_params=self.deep_params, name='fc7')
         dropout7 = dropout(self.fc7, self.KEEP_PROB)
 
+        # Latent Layer: FC (w ReLu)
         self.fclat = fc(dropout7, 4096, 48, deep_params=self.deep_params, name = 'fclat', relu=False, sigmoid=True)
-
+        
         # 8th Layer: FC and return unscaled activations
         self.fc8 = fc(self.fclat, 48, self.num_classes, deep_params=self.deep_params, relu=False, name='fc8')
 
 
     def get_map(self):
+        """ Loads pretrained Alexnet weights into the model"""
         weights_dict = np.load(self.WEIGHTS_PATH, encoding='bytes').item()
         wd = {}
         for op_name in weights_dict:

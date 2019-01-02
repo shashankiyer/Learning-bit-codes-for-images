@@ -63,7 +63,6 @@ def set_logger(log_path):
         stream_handler.setFormatter(logging.Formatter('%(message)s'))
         logger.addHandler(stream_handler)
 
-'''
 def save_dict_to_json(d, json_path):
     """Saves dict of floats in json file
 
@@ -75,4 +74,3 @@ def save_dict_to_json(d, json_path):
         # We need to convert the values to float for json (it doesn't accept np.array, np.float, )
         d = {k: float(v) for k, v in d.items()}
         json.dump(d, f, indent=4)
-'''
