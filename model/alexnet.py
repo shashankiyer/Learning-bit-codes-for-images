@@ -21,7 +21,7 @@ class AlexNet(object):
         self.KEEP_PROB = params.keep_prob
         self.SKIP_LAYER = skip_layer
 
-        if mode == 'validate':
+        if mode != tf.estimator.ModeKeys.TRAIN:
             self.KEEP_PROB = 1
 
         if os.path.exists('data/pretrained_alexnet/bvlc_alexnet.npy'):

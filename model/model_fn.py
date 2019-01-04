@@ -26,7 +26,6 @@ def model_fn(features, labels, mode, params):
     Returns:
         model_spec: tf.estimator.EstimatorSpec object
     """
-    is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
     # Unpack images
     images = features
@@ -36,28 +35,40 @@ def model_fn(features, labels, mode, params):
     # -----------------------------------------------------------
     # MODEL: define the layers of the model
     train_layers = ['fc8', 'fclat', 'fc7', 'fc6']
-    if is_training:
-        alexnet_model = AlexNet(images, train_layers, params, 'train')
-    else:
-        alexnet_model = AlexNet(images, train_layers, params, 'validate')
+    
+    alexnet_model = AlexNet(images, train_layers, params, mode)
 
     # Link variable to model output
     score = alexnet_model.fc8
     embeddings_bin = tf.cast(tf.round(alexnet_model.fclat), tf.bool)
-
+    embeddings_float = alexnet_model.fc7
+    
     # Creating a prediction dictionary
-    predictions = {'Bit_codes': embeddings_bin}
+    predictions = {'bit_codes': embeddings_bin, 'float_codes': embeddings_float}
 
-    # Unpack labels
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
+
+    # Cast labels
     labels = tf.cast(labels, tf.int32)
 
-    # List of trainable variables of the layers we want to train
-    var_list = [v for v in tf.trainable_variables() if v.name.split('/')[0] in train_layers]
-    
     # Op for calculating the loss
     with tf.name_scope("softmax_cross_ent"):
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=score,
-                                                                    labels=labels))
+                                                                    labels=labels))        
+
+    # Model's predictions
+    pred = tf.nn.softmax(score)
+
+    eval_metric_ops = {
+      "Evaluation_Accuracy": tf.metrics.accuracy(labels = tf.argmax(labels,1), predictions = tf.argmax(pred, 1))
+    }
+
+    if mode == tf.estimator.ModeKeys.EVAL:
+        return tf.estimator.EstimatorSpec(mode, loss=loss, eval_metric_ops=eval_metric_ops)
+
+    # List of trainable variables of the layers we want to train
+    var_list = [v for v in tf.trainable_variables() if v.name.split('/')[0] in train_layers]
 
     # Train op
     with tf.name_scope("train"):
@@ -96,9 +107,6 @@ def model_fn(features, labels, mode, params):
     for var in var_list:
         tf.summary.histogram(var.name[:-2], var)
 
-    # Model's predictions
-    pred = tf.nn.softmax(score)
-
     # Evaluation op: Accuracy of the model
     with tf.name_scope("accuracy"):
         correctness = tf.equal(tf.argmax(pred, 1), tf.argmax(labels, 1))
@@ -107,15 +115,9 @@ def model_fn(features, labels, mode, params):
     # Add the accuracy to the summary
     tf.summary.scalar('Training_Accuracy', accuracy)
 
-    eval_metric_ops = {
-      "Evaluation_Accuracy": tf.metrics.accuracy(labels = tf.argmax(labels,1), predictions = tf.argmax(pred, 1))
-    }
-
-    predictions['classification'] = pred
-
     # Assign pretrained weights to the AlexNet model
     init_fn = tf.contrib.framework.assign_from_values_fn(alexnet_model.get_map())
 
-    return tf.estimator.EstimatorSpec(mode = mode, predictions = predictions,
+    return tf.estimator.EstimatorSpec(mode = mode, predictions = None,
                                         loss = loss, train_op = train_op,
-                                        eval_metric_ops = eval_metric_ops, training_hooks = [RestoreHook(init_fn)])
+                                        eval_metric_ops = None, training_hooks = [RestoreHook(init_fn)])

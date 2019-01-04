@@ -10,11 +10,10 @@ The code is based on this [publication](http://www.iis.sinica.edu.tw/~kevinlin31
 - Python 3
 - TensorFlow >= 1.8rc0
 - Numpy
-- PIL
 
 ## Usage
 
-To replicate the experiment I performed, you will also need to download the CIFAR10 image dataset.
+To replicate the experiment I performed, you will need to download the CIFAR10 image dataset.
 
 Create a directory called 'data' in the root of this repository.
 
@@ -29,7 +28,7 @@ Make sure the tree of ```/path/to/project/data/cifar10``` looks like:
 |-- train
 `-- train.txt
 ```
-In addition, you will need to download the pretrained [AlexNet weights](http://www.cs.toronto.edu/~guerzhoy/tf_alexnet/bvlc_alexnet.npy). Ensure they are stored as:
+In addition, you will also need to download the pretrained [AlexNet weights](http://www.cs.toronto.edu/~guerzhoy/tf_alexnet/bvlc_alexnet.npy). Ensure they are stored as:
 ```
 data/pretrained_alexnet/bvlc_alexnet.npy
 ```

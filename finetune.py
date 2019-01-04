@@ -15,10 +15,10 @@ parser.add_argument('--model_config', default='experiments',
                     help="Experiment directory containing params.json")
 
 def get_train(params):
-  return read_dataset(params, mode=tf.contrib.learn.ModeKeys.TRAIN)
+  return read_dataset(params, mode=tf.estimator.ModeKeys.TRAIN)
 
 def get_valid(params):
-  return read_dataset(params, mode=tf.contrib.learn.ModeKeys.EVAL)
+  return read_dataset(params, mode=tf.estimator.ModeKeys.EVAL)
 
 if __name__ == '__main__':
     tf.reset_default_graph()

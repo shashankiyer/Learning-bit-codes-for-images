@@ -1,35 +1,25 @@
-import argparse, os, re
+import argparse, os
 
 import tensorflow as tf
 import numpy as np
 
+from model.datagenerator.input_fn import read_dataset
+from model.datagenerator.input_fn import get_labels_for_ss
+from model.model_fn import model_fn
 from model.utils import Params
-from model.alexnet import AlexNet
-from PIL import Image
 from validation_function import reli
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_dir', default='experiments/checkpoint_data/',
-                    help="Experiment directory to retrieve model checkpoints")
+parser.add_argument('--model_dir', default='experiments/checkpoint_data',
+                    help="Experiment directory to store model checkpoints")
 parser.add_argument('--model_config', default='experiments',
-                    help="Experiment directory containing params.json")
-parser.add_argument('--db_file', default='data/cifar10/fulltrain.txt',
-                    help="Path to the file containing database data")
-parser.add_argument('--query_file', default='data/cifar10/fulltest.txt',
-                    help="Path to the file containing query data")
-parser.add_argument('--data_dir', default='data/cifar10/',
-                    help="Path to the folder containing data")
+                    help="Experiment directory containing params.json") 
 
+def get_database(params):
+  return read_dataset(params, mode=tf.estimator.ModeKeys.PREDICT, db_flag = True)
 
-def __str_to_int(strings, classes):
-    
-    out = np.zeros(classes, dtype = np.int32)
-    for i in range (classes):
-        if strings[i] == '1':
-            out[i] = 1
-
-    return out
-
+def get_query(params):
+  return read_dataset(params, mode=tf.estimator.ModeKeys.PREDICT, db_flag = False)
 
 if __name__ == '__main__':
 
@@ -41,86 +31,40 @@ if __name__ == '__main__':
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = Params(json_path)
 
+    # Load the model
+    tf.logging.info("Loading the model...")
+    config = tf.estimator.RunConfig(tf_random_seed=230,
+                                    model_dir=args.model_dir,
+                                    save_summary_steps=params.save_summary_steps)
+    estimator = tf.estimator.Estimator(model_fn, params=params, config=config) 
 
-    images = tf.placeholder( tf.float32 , [ None , params.image_size, params.image_size, params.num_channels] , name = 'images')
-    labels = tf.placeholder( tf.int32 , [None , params.num_classes], name = 'labels' )
-    alexnet_model = AlexNet(images, None, params, 'validate')
+    # Compute embeddings for database images
+    tf.logging.info("Acquiring Database Embeddings")
+    predictions = estimator.predict(get_database(params))
+    
+    # Arrays to store db variables
+    database_lab, samples = get_labels_for_ss(params, db_flag = True)
+    database_embed_float = np.empty((samples, 4096))
+    database_embed_bin = np.empty((samples, 48), dtype = bool)
 
-    # Values from layer fc7 and fclat
-    emb_bin = tf.cast(tf.round(alexnet_model.fclat), tf.bool)
-    emb_flt = alexnet_model.fc7
+    for i, p in enumerate(predictions):
+        database_embed_float[i] = p['float_codes']
+        database_embed_bin[i] = p['bit_codes']
+    tf.logging.info("Done acquiring Database Embeddings")
 
-    with tf.Session() as sess:
+    # Compute embeddings for database images
+    tf.logging.info("Acquiring Query Embeddings")
+    predictions = estimator.predict(get_query(params))
 
-        # Regex for parsing every line
-        regex = re.compile('(?<=g )[0-1]( [0-1])*')
+    # Arrays to store query variables
+    query_lab, samples = get_labels_for_ss(params, db_flag = False)
+    query_embed_float = np.empty((samples, 4096))
+    query_embed_bin = np.empty((samples, 48), dtype = bool)
 
-        # Restore saved model
-        tf.train.Saver().restore(sess, tf.train.latest_checkpoint(args.model_dir))
+    for i, p in enumerate(predictions):
+        query_embed_float[i] = p['float_codes']
+        query_embed_bin[i] = p['bit_codes']
+    tf.logging.info("Done acquiring Query Embeddings")
 
-        with open(args.db_file, 'r') as db:
-            # Array to store images
-            ims = []
-
-            # Arrays to store db variables
-            database_lab = []
-            database_embed_float = []
-            database_embed_bin = []
-            
-            for line in db:
-
-                with Image.open(os.path.join(args.data_dir, line.split(' ')[0]), 'r') as im:
-                    ims.append(np.resize(np.array(im), (params.image_size, params.image_size, params.num_channels)))
-                database_lab.append(__str_to_int(re.search(regex, line)[0].split(" "), params.num_classes))
-            
-            tf.logging.info("Forward propagating database images through the DNN")
-
-            for k in range(0, len(ims), params.batch_size):
-                current_batch_ims = ims[k: k + params.batch_size]
-                current_batch_labels = database_lab[k: k + params.batch_size]
-
-                flt, binn = sess.run([emb_flt, emb_bin], feed_dict = {images : current_batch_ims, labels : current_batch_labels})
-
-                database_embed_float.extend(flt)
-                database_embed_bin.extend(binn)
-
-            # Clearing database images
-            ims.clear()
-
-        with open(args.query_file, 'r') as qu:
-            
-            # Arrays to store query variables
-            query_lab = []
-            query_embed_bin = []
-            query_embed_float = []
-
-            for line in qu:
-
-                with Image.open(os.path.join(args.data_dir, line.split(' ')[0]), 'r') as im:
-                    ims.append(np.resize(np.array(im), (params.image_size, params.image_size, params.num_channels)))
-                query_lab.append(__str_to_int(re.search(regex, line)[0].split(" "), params.num_classes))
-            
-            tf.logging.info("Forward propagating query images through the DNN")
-            
-            for k in range(0, len(ims), params.batch_size):
-                current_batch_ims = ims[k: k + params.batch_size]
-                current_batch_labels = query_lab[k: k + params.batch_size]
-                
-                flt, binn = sess.run([emb_flt, emb_bin], feed_dict = {images : current_batch_ims, labels : current_batch_labels})
-
-                query_embed_float.extend(flt)
-                query_embed_bin.extend(binn)
-        
-            # Clearing query images
-            ims.clear()
-
-        database_embed_bin = np.array(database_embed_bin)
-        database_embed_float = np.array(database_embed_float)
-        database_lab = np.array(database_lab)
-
-        query_embed_bin = np.array(query_embed_bin)
-        query_embed_float = np.array(query_embed_float)
-        query_lab = np.array(query_lab)
-        
-        print("Begining similarity search for", query_embed_bin.shape[0], "query images on" , database_embed_bin.shape[0], "database images")
-        print("Similarity Search accuracy = ", reli(12, 120, query_embed_bin, query_embed_float, query_lab, database_embed_bin, database_embed_float, database_lab))
+    print("Begining similarity search for", query_embed_bin.shape[0], "query images on" , database_embed_bin.shape[0], "database images")
+    print("Similarity Search accuracy = %.2f" % reli(12, 120, query_embed_bin, query_embed_float, query_lab, database_embed_bin, database_embed_float, database_lab))
