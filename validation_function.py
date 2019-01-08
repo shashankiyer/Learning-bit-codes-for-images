@@ -17,15 +17,24 @@ def compute_hamming_dist(query, database):
     
     return res
 
-def top_k(k, euclidean_arr, database_lab):
-
-    euclidean_arr = np.argsort(euclidean_arr)
-    euclidean_arr = euclidean_arr[:k:1]
+def coarse_grain_search(threshold, query_emb_bin, database_emb_bin):
     
-    return np.take(database_lab, euclidean_arr)
+    hamming = compute_hamming_dist(query_emb_bin, database_emb_bin)
+    ind = np.array([np.where( i <= threshold) for i in hamming])
+
+    return ind
+
 
 def euclidean_dist(query, database):
     return np.sqrt(np.sum(np.square(np.expand_dims(query, 0) - database), axis = -1))
+
+def fine_grain_search(k, euclidean_arr, list_indices):
+
+    euclidean_arr = np.argsort(euclidean_arr)
+    list_indices = list_indices[euclidean_arr]
+    list_indices = list_indices[:k:1]
+  
+    return list_indices
 
 def reli_image_wise(k, each_query, list_indices, database_emb_float, each_query_lab, database_lab):
 
@@ -38,19 +47,20 @@ def reli_image_wise(k, each_query, list_indices, database_emb_float, each_query_
     
     db_lab_take = np.take(database_lab, list_indices, axis = 0)
     
-    db_lab_k = top_k(k, euc, db_lab_take)
+    fg_list_indices = fine_grain_search(k, euc, db_lab_take)
+    
+    db_lab_k = np.take(database_lab, fg_list_indices)
     
     res = np.equal(np.expand_dims(each_query_lab,0), db_lab_k)
     
     res = np.mean(res)
 
     return res
-    
+
 
 def reli(threshold, k, query_emb_bin, query_emb_float, query_lab, database_emb_bin, database_emb_float, database_lab):
     
-    hamming = compute_hamming_dist(query_emb_bin, database_emb_bin)
-    ind = np.array([np.where( i <= threshold) for i in hamming])
+    ind = coarse_grain_search(threshold, query_emb_bin, database_emb_bin)
     
     database_lab = np.argmax(database_lab,1)
     query_lab = np.argmax(query_lab,1)
