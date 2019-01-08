@@ -45,9 +45,7 @@ def reli_image_wise(k, each_query, list_indices, database_emb_float, each_query_
     
     euc = euclidean_dist( each_query , db_take)
     
-    db_lab_take = np.take(database_lab, list_indices, axis = 0)
-    
-    fg_list_indices = fine_grain_search(k, euc, db_lab_take)
+    fg_list_indices = fine_grain_search(k, euc, list_indices)
     
     db_lab_k = np.take(database_lab, fg_list_indices)
     
