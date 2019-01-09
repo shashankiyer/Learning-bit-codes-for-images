@@ -52,7 +52,7 @@ def reli_image_wise(k, each_query, list_indices, database_emb_float, each_query_
     # Select db embeddings for fine-grain search
     db_take = np.take(database_emb_float , list_indices , axis=0)
     
-    euc = euclidean_dist( each_query , db_take)
+    euc = euclidean_dist(each_query , db_take)
     
     fg_list_indices = fine_grain_search(k, euc, list_indices)
     
