@@ -1,3 +1,7 @@
+# @author : Shashank Iyer
+
+""" Finetune the DNN to correctly classify a new dataset"""
+
 import argparse
 import os
 
@@ -37,7 +41,7 @@ if __name__ == '__main__':
                                     save_summary_steps=params.save_summary_steps)
 
     # Train spec
-    train_spec = tf.estimator.TrainSpec(input_fn=get_train(params), max_steps=1000)
+    train_spec = tf.estimator.TrainSpec(input_fn=get_train(params), max_steps=10000)
 
     # Eval spec
     eval_spec = tf.estimator.EvalSpec(input_fn=get_valid(params))

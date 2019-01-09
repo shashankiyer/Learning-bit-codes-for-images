@@ -1,11 +1,15 @@
+# @author : Shashank Iyer
+
+"""Contains functions that compute similarity search precision"""
+
 import numpy as np
 
-"""Contains functions for similarity search """
-
+# Computes the hamming distance between bitvectors
 def hamming_dist(bitvec1, bitvec2):
 
     return np.count_nonzero(bitvec1!=bitvec2)
 
+# Computes pairwise hamming distance between the query and database bitvectors
 def compute_hamming_dist(query, database):
     
     res = np.empty(shape=(len(query), len(database)), dtype=int)
@@ -17,6 +21,7 @@ def compute_hamming_dist(query, database):
     
     return res
 
+# Computes pairwise hamming distances and keep only those images that are within a threshold
 def coarse_grain_search(threshold, query_emb_bin, database_emb_bin):
     
     hamming = compute_hamming_dist(query_emb_bin, database_emb_bin)
@@ -24,10 +29,11 @@ def coarse_grain_search(threshold, query_emb_bin, database_emb_bin):
 
     return ind
 
-
+# Compute pairwise Euclidean distances between a query and all database images
 def euclidean_dist(query, database):
     return np.sqrt(np.sum(np.square(np.expand_dims(query, 0) - database), axis = -1))
 
+# Select k images that are closest to the query
 def fine_grain_search(k, euclidean_arr, list_indices):
 
     euclidean_arr = np.argsort(euclidean_arr)
@@ -36,23 +42,30 @@ def fine_grain_search(k, euclidean_arr, list_indices):
   
     return list_indices
 
+# Computes ground truth relevance imagewise.
 def reli_image_wise(k, each_query, list_indices, database_emb_float, each_query_lab, database_lab):
 
-    db_take = np.take(database_emb_float , list_indices , axis=0)
-
+    # if no images are within the specified hamming threshold of the query, return 0
     if len(list_indices) == 0:
         return 0
     
+    # Select db embeddings for fine-grain search
+    db_take = np.take(database_emb_float , list_indices , axis=0)
+    
     euc = euclidean_dist( each_query , db_take)
     
-    db_lab_take = np.take(database_lab, list_indices, axis = 0)
+    fg_list_indices = fine_grain_search(k, euc, list_indices)
     
-    fg_list_indices = fine_grain_search(k, euc, db_lab_take)
-    
+    # Select top 'k' db image's labels
     db_lab_k = np.take(database_lab, fg_list_indices)
     
+    # Comparing top 'k' db labels with query label
     res = np.equal(np.expand_dims(each_query_lab,0), db_lab_k)
     
+    # mAP computation
+    den = np.arange(1, res.shape[0] + 1, dtype = int)
+    num = np.cumsum(res)
+    res = num * res / den
     res = np.mean(res)
 
     return res

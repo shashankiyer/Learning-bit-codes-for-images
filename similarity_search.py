@@ -1,3 +1,7 @@
+# @author : Shashank Iyer
+
+"""For a detailed explanation, please refer to my blog."""
+
 import argparse, os
 
 import tensorflow as tf

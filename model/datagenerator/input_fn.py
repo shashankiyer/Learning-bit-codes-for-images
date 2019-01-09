@@ -1,3 +1,7 @@
+# @author : Shashank Iyer
+
+"""Function that returns an input pipeline to a tf estimator and labels for similarity search"""
+
 from model.datagenerator.input_parser import ImageDataParser
 import tensorflow as tf
 import argparse
@@ -8,7 +12,7 @@ parser.add_argument('--train_file', default='data/cifar10/train.txt',
                     help="Path to the file containing training data")
 parser.add_argument('--val_file', default='data/cifar10/test.txt',
                     help="Path to the file containing validation data")
-parser.add_argument('--database_file', default='data/cifar10/test.txt',
+parser.add_argument('--database_file', default='data/cifar10/train.txt',
                     help="Path to the file containing database data")                    
 parser.add_argument('--query_file', default='data/cifar10/test.txt',
                     help="Path to the file containing database data")                    

@@ -1,3 +1,5 @@
+# @author : Shashank Iyer
+
 """Containes a helper class for image input pipelines in tensorflow."""
 
 import tensorflow as tf
@@ -10,8 +12,7 @@ from tensorflow.python.framework.ops import convert_to_tensor
 import re, os
 
 class ImageDataParser(object):
-    """Wrapper class around the Tensorflows dataset pipeline.
-    """
+    """Wrapper class around the Tensorflows dataset pipeline."""
 
     def __init__(self, txt_file, data_dir, mode, params):
         """Create a new ImageDataParser.
@@ -98,7 +99,7 @@ class ImageDataParser(object):
         # load and preprocess the image
         img_string = tf.read_file(filename)
         img_decoded = tf.image.decode_png(img_string, channels = self.num_channels)
-        img_resized = tf.image.resize_images(img_decoded, [self.image_size, self.image_size])
+        img_resized = tf.image.resize_image_with_pad(img_decoded, target_height = self.image_size, target_width = self.image_size)
         
         # Dataaugmentation.
         img_centered = tf.subtract(img_resized, self.IMAGENET_MEAN)

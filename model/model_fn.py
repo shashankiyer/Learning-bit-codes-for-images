@@ -1,3 +1,5 @@
+"""Contains the model definition. This function is called by a tf estimator"""
+
 import os
 
 import numpy as np
@@ -71,6 +73,7 @@ def model_fn(features, labels, mode, params):
     var_list = [v for v in tf.trainable_variables() if v.name.split('/')[0] in train_layers]
 
     # Train op
+    # Adapted from https://github.com/thulab/DeepHash
     with tf.name_scope("train"):
 
         gst = tf.train.get_or_create_global_step()
