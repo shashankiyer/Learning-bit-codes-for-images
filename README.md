@@ -1,9 +1,11 @@
 # Learning-bit-codes-for-images
 
-The repository contains an implementation for Image2Vec.
+The repository contains an implementation for Image2Vec and Similarity Search.
 It uses a pretrained AlexNet with a latent hashing layer to learn bit vectors.
 
-The code is based on this [publication](http://www.iis.sinica.edu.tw/~kevinlin311.tw/cvprw15.pdf) made in [CVPR](http://cvpr2019.thecvf.com/) in 2015.
+The code is based on this [publication](http://www.iis.sinica.edu.tw/~kevinlin311.tw/cvprw15.pdf) made at CVPR in 2015.
+
+Here is a link to my [blog](https://medium.com/@shashank_iyer/learning-bit-codes-for-images-e09966891acc) for a better understanding of how this process works.
 
 ## Requirements
 
@@ -11,7 +13,7 @@ The code is based on this [publication](http://www.iis.sinica.edu.tw/~kevinlin31
 - TensorFlow >= 1.8rc0
 - Numpy
 
-## Usage
+## Setup
 
 To replicate the experiment I performed, you will need to download the CIFAR10 image dataset.
 
@@ -56,3 +58,36 @@ The code saves summaries so you can track the training and validation.
 ```
 tensorboard --logdir experiments/checkpoint_data
 ```
+
+## Getting things to run
+
+1. Get access to a system with a recent version of tensorflow and a GPU.
+   We used the Ubuntu Deep Learning image (v=20) and a g3s.xlarge available on AWS EC2. 
+
+   Note, once you login you will need to install Tensorflow by running ```conda install tensorflow-gpu```
+
+2. Clone the repo and follow the **Setup** instructions.
+
+3. You may finetune the model by running ```python finetune.py```.
+   This will display information to indicate finetuning is in progress.
+
+4. Let it run for a while (I recommend 20k steps).
+   You can watch this process by launnching Tensorboard.
+   
+   A. If you are using an Amazon EC2 instance, you will need to create a "tunnel" by running:
+   
+   ```ssh -L 127.0.0.1:6006:127.0.0.1:6006 -i path/to/your/key ubuntu@public_dns```
+   
+   B. Launch Tensorboard by running:
+   
+   ```tensorboard --logdir path/to/project/experiments/checkpoint_data```
+   
+   C. On your local machine, you may browse to ```localhost:6006``` to view the results.
+
+5. You may stop finetuning with Ctrl-C. This will give you an opportunity to get some precision numbers.
+
+   Run ```python similarity_search.py```
+   
+   This will report mAP ( mean average precision ) that is well described [here](https://medium.com/@jonathan_hui/map-mean-average-precision-for-object-detection-45c121a31173).
+
+6. You may resume finetuning by running ```python finetune.py```
